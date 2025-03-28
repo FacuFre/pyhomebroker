@@ -123,7 +123,7 @@ def ejecutar_ciclo():
 
     print("📡 Subscribiendo: government_bonds - 24hs")
     hb.online.subscribe_securities('government_bonds', '24hs')
-            print("📡 Subscribiendo: short_term_government_bonds - 24hs")
+                    print("📡 Subscribiendo: short_term_government_bonds - 24hs")
     hb.online.subscribe_securities('short_term_government_bonds', '24hs')
     print("📡 Subscribiendo: repos")
     hb.online.subscribe_repos()
