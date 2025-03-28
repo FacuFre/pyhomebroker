@@ -117,7 +117,7 @@ def ejecutar_ciclo():
     hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
     hb.online.connect()
 
-            print("📡 Subscribiendo: government_bonds - 24hs")
+        print("📡 Subscribiendo: government_bonds - 24hs")
 hb.online.subscribe_securities('government_bonds', '24hs')
     print("📡 Subscribiendo: dollar_linked_bonds - 24hs")
 hb.online.subscribe_securities('dollar_linked_bonds', '24hs')
@@ -125,7 +125,7 @@ hb.online.subscribe_securities('dollar_linked_bonds', '24hs')
 hb.online.subscribe_securities('provincial_bonds', '24hs')
     print("📡 Subscribiendo: short_term_government_bonds - 24hs")
 hb.online.subscribe_securities('short_term_government_bonds', '24hs')
-            print("📡 Subscribiendo: repos")
+        print("📡 Subscribiendo: repos")
 hb.online.subscribe_repos()
 
     print("✅ Conectado. Esperando 5 segundos para recibir datos...")
