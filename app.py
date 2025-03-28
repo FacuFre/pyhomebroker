@@ -2,11 +2,12 @@
 import time
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 from pyhomebroker import HomeBroker
 import pytz
 from collections import defaultdict
+import gc
 
 # Supabase config
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -30,7 +31,7 @@ def guardar_en_supabase(tabla, rows):
     }
     data = rows.to_dict(orient="records")
     for record in data:
-        record["updated_at"] = datetime.utcnow().isoformat()
+        record["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = requests.post(url, headers=headers, json=record)
         print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
         contador_categorias[tabla] += 1
@@ -38,13 +39,17 @@ def guardar_en_supabase(tabla, rows):
 def clasificar_symbol(symbol):
     symbol = symbol.upper()
 
+    # Ignorar instrumentos con cotización Cable
+    if symbol.endswith("C"):
+        return None
+
     tasa_fija = {"S31M5", "S16A5", "BBA2S", "S28A5", "S16Y5", "BBY5", "S30Y5", "S18J5", "BJ25", "S30J5", "S31L5", "S29G5", "S29S5", "S30S5", "T17O5", "S30L5", "S10N5", "S28N5", "T30E6", "T3F6", "T30J6", "T15E7"}
     bonos_soberanos = {"AL29", "AL29D", "AL30", "AL30D", "AL35", "AL35D", "AL41D", "AL41", "AL14D", "GD29", "GD29D", "GD30", "GD30D", "GD35", "GD35D", "GD38", "GD38D", "GD41", "GD41D", "GD46", "GD46D"}
     dolar_linked = {"TV25", "TZV25", "TZVD5", "D16F6", "TZV26"}
     bopreales = {"BPJ5D", "BPA7D", "BPB7D", "BPC7D", "BPD7D"}
     bonos_cer = {"TZXM5", "TC24", "TZXJ5", "TZX05", "TZXKD5", "TZXM6", "TX06", "TX26", "TZXM7", "TX27", "TXD7", "TX28"}
-    cauciones = {"CAUCI1", "CAUCI2"}  # agregar los reales si se conocen
-    futuros_dolar = {"DOFUTABR24", "DOFUTJUN24"}  # agregar los reales si se conocen
+    cauciones = {"CAUCI1", "CAUCI2"}
+    futuros_dolar = {"DOFUTABR24", "DOFUTJUN24"}
 
     if symbol in tasa_fija:
         return "tasa_fija"
@@ -72,7 +77,7 @@ def on_securities(online, quotes):
     thisData["datetime"] = pd.to_datetime(thisData["datetime"])
 
     for _, row in thisData.iterrows():
-        symbol = row["symbol"].split(" - ")[0]  # quitar el plazo
+        symbol = row["symbol"].split(" - ")[0]
         tabla = clasificar_symbol(symbol)
         if tabla:
             guardar_en_supabase(tabla, pd.DataFrame([row]))
@@ -92,7 +97,7 @@ def on_repos(online, quotes):
     guardar_en_supabase("cauciones", thisData.reset_index())
 
 def on_options(online, quotes):
-    pass  # no estamos usando opciones para este caso
+    pass
 
 def on_error(online, error):
     print(f"Error Message Received: {error}")
@@ -112,7 +117,6 @@ def ejecutar_ciclo():
     hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
     hb.online.connect()
 
-    # Suscripciones solo para las categorías relevantes
     hb.online.subscribe_securities('government_bonds', '24hs')
     hb.online.subscribe_securities('dollar_linked_bonds', '24hs')
     hb.online.subscribe_securities('provincial_bonds', '24hs')
@@ -127,7 +131,8 @@ def ejecutar_ciclo():
     for tabla, cantidad in contador_categorias.items():
         print(f"  - {tabla}: {cantidad} registros guardados")
 
-    print("🔁 Desconectado. Esperando 5 minutos para el próximo ciclo...")
+    gc.collect()
+    print("🧹 Memoria limpiada. Esperando 5 minutos para el próximo ciclo...")
     time.sleep(300)
 
 def dentro_de_horario():
@@ -144,3 +149,4 @@ if __name__ == "__main__":
         else:
             print("🕒 Fuera de horario de mercado. Esperando 1 minuto...")
             time.sleep(60)
+
