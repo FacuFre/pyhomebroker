@@ -3,25 +3,46 @@ import time
 import requests
 import gc
 from datetime import datetime, timezone
-from collections import defaultdict
 import pandas as pd
 from pyhomebroker import HomeBroker
-import pytz
 
+# Configuración de Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
 
 if not SUPABASE_URL or not SUPABASE_API_KEY:
-    raise ValueError("❌ SUPABASE_URL o SUPABASE_API_KEY no están configurados!")
+    raise ValueError("❌ Faltan credenciales de Supabase")
 
-broker = int(os.getenv("BROKER_ID"))
-dni = os.getenv("DNI")
-user = os.getenv("USER")
-password = os.getenv("PASSWORD")
+# Configuración de PyHomeBroker
+BROKER_ID = int(os.getenv("BROKER_ID"))
+DNI = os.getenv("DNI")
+USER = os.getenv("USER")
+PASSWORD = os.getenv("PASSWORD")
 
-contador_categorias = defaultdict(int)
+# Listas EXACTAS de tus símbolos por categoría
+TASA_FIJA = {
+    "S31M5", "S16A5", "BBA2S", "S28A5", "S16Y5", "BBY5", "S30Y5", "S18J5", "BJ25",
+    "S30J5", "S31L5", "S29G5", "S29S5", "S30S5", "T17O5", "S30L5", "S10N5",
+    "S28N5", "T30E6", "T3F6", "T30J6", "T15E7"
+}
+BONOS_SOBERANOS = {
+    "AL29", "AL29D", "AL30", "AL30D", "AL35", "AL35D", "AL41D", "AL41",
+    "AL14D", "GD29", "GD29D", "GD30", "GD30D", "GD35", "GD35D", "GD38",
+    "GD38D", "GD41", "GD41D", "GD46", "GD46D"
+}
+DOLAR_LINKED = {"TV25", "TZV25", "TZVD5", "D16F6", "TZV26"}
+BOPREALES = {"BPJ5D", "BPA7D", "BPB7D", "BPC7D", "BPD7D"}
+BONOS_CER = {
+    "TZXM5", "TC24", "TZXJ5", "TZX05", "TZXKD5", "TZXM6", "TX06", "TX26",
+    "TZXM7", "TX27", "TXD7", "TX28"
+}
+CAUCIONES = {"CAUCI1", "CAUCI2"}
+FUTUROS_DOLAR = {"DOFUTABR24", "DOFUTJUN24"}
 
-def guardar_en_supabase(tabla, rows):
+def guardar_en_supabase(tabla: str, df: pd.DataFrame):
+    """
+    Upsert de df en la tabla (con on_conflict=symbol).
+    """
     url = f"{SUPABASE_URL}/rest/v1/{tabla}?on_conflict=symbol"
     headers = {
         "apikey": SUPABASE_API_KEY,
@@ -29,125 +50,98 @@ def guardar_en_supabase(tabla, rows):
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates"
     }
-
-    data = rows.to_dict(orient="records")
-
+    data = df.to_dict(orient="records")
     for record in data:
+        # Timestamp de actualización
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
+        # Asignar un symbol si viene vacío
         if not record.get("symbol"):
-            record["symbol"] = "CAUCION"
+            record["symbol"] = "SIN_SYMBOL"
 
-        print(f"📤 Enviando a Supabase → {tabla} | Payload:")
-        print(record)
+        print(f"📤 Insertando en Supabase -> Tabla: {tabla}\n", record)
 
-        response = requests.post(url, headers=headers, json=record)
-        if response.status_code not in (200, 201):
-            print(f"❌ Error Supabase [{tabla}] → {response.status_code}: {response.text}")
-        else:
-            contador_categorias[tabla] += 1
+        resp = requests.post(url, headers=headers, json=record)
+        if resp.status_code not in (200, 201):
+            print(f"❌ Error {resp.status_code} {resp.text}")
 
-def clasificar_symbol(symbol):
-    symbol_clean = symbol.upper().split(" - ")[0].strip()
+def main_loop():
+    """
+    Polling cada 5 minutos.
+    Llama a get_quotes para cada categoría (tasa_fija, bonos_soberanos, etc.)
+    y upserta en la tabla correspondiente.
+    """
+    hb = HomeBroker(BROKER_ID)
+    hb.auth.login(dni=DNI, user=USER, password=PASSWORD, raise_exception=True)
 
-    tasa_fija = {"S31M5", "S16A5", "BBA2S", "S28A5", "S16Y5", "BBY5", "S30Y5", "S18J5", "BJ25",
-                 "S30J5", "S31L5", "S29G5", "S29S5", "S30S5", "T17O5", "S30L5", "S10N5",
-                 "S28N5", "T30E6", "T3F6", "T30J6", "T15E7"}
-    bonos_soberanos = {"AL29", "AL29D", "AL30", "AL30D", "AL35", "AL35D", "AL41D", "AL41",
-                       "AL14D", "GD29", "GD29D", "GD30", "GD30D", "GD35", "GD35D", "GD38",
-                       "GD38D", "GD41", "GD41D", "GD46", "GD46D"}
-    dolar_linked = {"TV25", "TZV25", "TZVD5", "D16F6", "TZV26"}
-    bopreales = {"BPJ5D", "BPA7D", "BPB7D", "BPC7D", "BPD7D"}
-    bonos_cer = {"TZXM5", "TC24", "TZXJ5", "TZX05", "TZXKD5", "TZXM6", "TX06", "TX26",
-                 "TZXM7", "TX27", "TXD7", "TX28"}
-    cauciones = {"CAUCI1", "CAUCI2"}
-    futuros_dolar = {"DOFUTABR24", "DOFUTJUN24"}
+    print("✅ Conectado a PyHomeBroker. Empezamos el polling de 5 minutos...")
 
-    if symbol_clean in tasa_fija:
-        return "tasa_fija"
-    elif symbol_clean in bonos_soberanos:
-        return "bonos_soberanos"
-    elif symbol_clean in dolar_linked:
-        return "dolar_linked"
-    elif symbol_clean in bopreales:
-        return "bopreales"
-    elif symbol_clean in bonos_cer:
-        return "bonos_cer"
-    elif symbol_clean in cauciones:
-        return "cauciones"
-    elif symbol_clean in futuros_dolar:
-        return "futuros_dolar"
-    else:
-        print(f"⚠️ No se reconoce el símbolo '{symbol_clean}'")
-        return None
+    while True:
+        try:
+            # 1) Tasa fija
+            if TASA_FIJA:
+                print("\n🔄 Consultando Tasa Fija...")
+                df_tasa_fija = hb.get_quotes(list(TASA_FIJA), settlement="24hs")
+                print(f"   Obtenidas {len(df_tasa_fija)} filas de Tasa Fija.")
+                if not df_tasa_fija.empty:
+                    guardar_en_supabase("tasa_fija", df_tasa_fija)
 
-def on_securities(online, quotes):
-    print(f"📥 [on_securities] Cantidad de instrumentos: {len(quotes)}")
-    thisData = quotes.reset_index()
+            # 2) Bonos Soberanos
+            if BONOS_SOBERANOS:
+                print("\n🔄 Consultando Bonos Soberanos...")
+                df_bonos_sob = hb.get_quotes(list(BONOS_SOBERANOS), settlement="24hs")
+                print(f"   Obtenidas {len(df_bonos_sob)} filas de Bonos Soberanos.")
+                if not df_bonos_sob.empty:
+                    guardar_en_supabase("bonos_soberanos", df_bonos_sob)
 
-    if not thisData.empty:
-        print(f"   Ejemplo row: {thisData.iloc[0].to_dict()}")
+            # 3) Dólar Linked
+            if DOLAR_LINKED:
+                print("\n🔄 Consultando Dólar Linked...")
+                df_dolar_linked = hb.get_quotes(list(DOLAR_LINKED), settlement="24hs")
+                print(f"   Obtenidas {len(df_dolar_linked)} filas de Dólar Linked.")
+                if not df_dolar_linked.empty:
+                    guardar_en_supabase("dolar_linked", df_dolar_linked)
 
-    thisData["symbol"] = thisData["symbol"] + " - " + thisData["settlement"]
-    thisData = thisData.drop(["settlement"], axis=1)
-    thisData["change"] = thisData["change"] / 100
-    thisData["datetime"] = pd.to_datetime(thisData["datetime"])
+            # 4) Bopreales
+            if BOPREALES:
+                print("\n🔄 Consultando Bopreales...")
+                df_bopreales = hb.get_quotes(list(BOPREALES), settlement="24hs")
+                print(f"   Obtenidas {len(df_bopreales)} filas de Bopreales.")
+                if not df_bopreales.empty:
+                    guardar_en_supabase("bopreales", df_bopreales)
 
-    for _, row in thisData.iterrows():
-        symbol = row["symbol"]
-        tabla = clasificar_symbol(symbol)
-        if tabla:
-            df_single = pd.DataFrame([row])
-            print(f"✅ Insertando symbol='{symbol}' en tabla='{tabla}'")
-            guardar_en_supabase(tabla, df_single)
+            # 5) Bonos CER
+            if BONOS_CER:
+                print("\n🔄 Consultando Bonos CER...")
+                df_bonos_cer = hb.get_quotes(list(BONOS_CER), settlement="24hs")
+                print(f"   Obtenidas {len(df_bonos_cer)} filas de Bonos CER.")
+                if not df_bonos_cer.empty:
+                    guardar_en_supabase("bonos_cer", df_bonos_cer)
 
-def ejecutar():
-    global contador_categorias
-    contador_categorias = defaultdict(int)
+            # 6) Cauciones
+            if CAUCIONES:
+                print("\n🔄 Consultando Cauciones...")
+                df_cauciones = hb.get_quotes(list(CAUCIONES), settlement="24hs")
+                print(f"   Obtenidas {len(df_cauciones)} filas de Cauciones.")
+                if not df_cauciones.empty:
+                    guardar_en_supabase("cauciones", df_cauciones)
 
-    hb = HomeBroker(
-        broker,
-        on_securities=on_securities
-    )
-    hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
-    hb.online.connect()
+            # 7) Futuros de dólar
+            if FUTUROS_DOLAR:
+                print("\n🔄 Consultando Futuros Dólar...")
+                df_futuros_dolar = hb.get_quotes(list(FUTUROS_DOLAR), settlement="24hs")
+                print(f"   Obtenidas {len(df_futuros_dolar)} filas de Futuros Dólar.")
+                if not df_futuros_dolar.empty:
+                    guardar_en_supabase("futuros_dolar", df_futuros_dolar)
 
-    print("📡 Suscribiendo: government_bonds - 24hs")
-    hb.online.subscribe_securities('government_bonds', '24hs')
-    print("📡 Suscribiendo: short_term_government_bonds - 24hs")
-    hb.online.subscribe_securities('short_term_government_bonds', '24hs')
+            # Esperamos 5 minutos antes de la próxima consulta
+            print("\n⌛ Esperando 5 minutos para la próxima actualización...")
+            time.sleep(300)
 
-    print("🟢 Conexión continua: se mantendrá escuchando.")
-    try:
-        while True:
-            time.sleep(2)
-            gc.collect()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        print("🔌 Desconectando HomeBroker...")
-        hb.online.disconnect()
+        except Exception as e:
+            print(f"❌ Error en la consulta: {e}")
+            time.sleep(60)  # intentar de nuevo en 1 min
 
-def dentro_de_horario():
-    ahora = datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
-    return 9 <= ahora.hour < 20
+        gc.collect()
 
 if __name__ == "__main__":
-    import sys
-    inicio = time.time()
-
-    print("🚀 Iniciando script (modo conexión continua)")
-    while True:
-        if dentro_de_horario():
-            try:
-                ejecutar()   # acá no se sale hasta que interrumpas el proceso
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                time.sleep(10)
-        else:
-            print("🌙 Fuera de horario, se reintenta en 60s.")
-            time.sleep(60)
-
-        # Por si querés un reinicio cada 1 hora
-        if time.time() - inicio > 3600:
-            print("♻️ Reinicio programado (1 hora).")
-            os.execv(sys.executable, ['python'] + sys.argv)
+    main_loop()
