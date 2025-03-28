@@ -34,6 +34,8 @@ def guardar_en_supabase(tabla, rows):
         print(f"📤 Enviando a Supabase: {record}")
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = requests.post(url, headers=headers, json=record)
+            if response.status_code >= 300:
+                print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
         if response.status_code >= 300:
         print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
         print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
