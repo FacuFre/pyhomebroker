@@ -140,7 +140,7 @@ def ejecutar_ciclo():
     hb.online.subscribe_repos()
 
     print("✅ Conectado. Esperando 5 segundos para recibir datos...")
-    time.sleep(5)
+    time.sleep(15)
     hb.online.disconnect()
 
     print("📊 Resumen del ciclo:")
