@@ -1,4 +1,4 @@
-# main.py
+# app.py
 import os
 import time
 from datetime import datetime
@@ -35,32 +35,35 @@ def main():
     hb = HomeBroker(broker_id=BROKER_ID)
     hb.auth.login(dni=DNI, user=USER, password=PASSWORD, raise_exception=True)
 
-    tipos = [
-        ("acciones", hb.get_stocks),
-        ("bonos", hb.get_bonds),
-        ("cedears", hb.get_cedears),
-        ("letras", hb.get_short_term_government_bonds),
-        ("cauciones", hb.get_repos),
-        ("opciones", hb.get_options),
-        ("ons", hb.get_corporate_bonds),
-        ("panel_general", hb.get_general_board_stocks),
-    ]
+    instrumentos = hb.get_instruments()
 
-    for tabla, fetch_func in tipos:
-        try:
-            instrumentos = fetch_func()
-            for inst in instrumentos:
-                guardar_en_supabase(
-                    tabla=tabla,
-                    symbol=inst["symbol"],
-                    description=inst.get("description", ""),
-                    last=inst.get("last", 0),
-                    bid=inst.get("bid", 0),
-                    ask=inst.get("ask", 0)
-                )
-                time.sleep(0.1)
-        except Exception as e:
-            print(f"Error con {tabla}: {e}")
+    tipo_to_tabla = {
+        "acciones": "acciones",
+        "bonos": "bonos",
+        "cedears": "cedears",
+        "letras": "letras",
+        "cauciones": "cauciones",
+        "opciones": "opciones",
+        "obligaciones negociables": "ons",
+        "panel general": "panel_general",
+    }
+
+    for inst in instrumentos:
+        tipo = inst.get("instrument_type", "").lower()
+        tabla = tipo_to_tabla.get(tipo)
+
+        if tabla:
+            guardar_en_supabase(
+                tabla=tabla,
+                symbol=inst["symbol"],
+                description=inst.get("description", ""),
+                last=inst.get("last", 0),
+                bid=inst.get("bid", 0),
+                ask=inst.get("ask", 0)
+            )
+            time.sleep(0.1)
+        else:
+            print(f"Tipo desconocido: {tipo} | {inst['symbol']}")
 
 if __name__ == "__main__":
     main()
