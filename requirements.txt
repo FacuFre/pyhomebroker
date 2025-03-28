@@ -1,7 +1,7 @@
-pip install xlwings
-pip install pandas
-pip install pyhomebroker
-pip install pyhomebroker --upgrade --no-cache-dir
+xlwings
+pandas
+pyhomebroker
+pyhomebroker --upgrade --no-cache-dir
 numpy>=1.18.1
 pandas>=1.0.0
 pyquery>=1.2
