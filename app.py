@@ -31,12 +31,10 @@ def guardar_en_supabase(tabla, rows):
     }
     data = rows.to_dict(orient="records")
     for record in data:
-        
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = requests.post(url, headers=headers, json=record)
         if response.status_code >= 300:
             print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
-        
         contador_categorias[tabla] += 1
 
 def clasificar_symbol(symbol):
@@ -68,11 +66,9 @@ def clasificar_symbol(symbol):
     elif symbol in futuros_dolar:
         return "futuros_dolar"
     else:
-        print(f"⚠️ No clasificado: {symbol}")
         return None
 
 def on_securities(online, quotes):
-    
     thisData = quotes.reset_index()
     thisData["symbol"] = thisData["symbol"] + " - " + thisData["settlement"]
     thisData = thisData.drop(["settlement"], axis=1)
@@ -81,7 +77,6 @@ def on_securities(online, quotes):
 
     for _, row in thisData.iterrows():
         symbol = row["symbol"].split(" - ")[0]
-        
         tabla = clasificar_symbol(symbol)
         if tabla:
             guardar_en_supabase(tabla, pd.DataFrame([row]))
@@ -123,7 +118,7 @@ def ejecutar_ciclo():
 
     print("📡 Subscribiendo: government_bonds - 24hs")
     hb.online.subscribe_securities('government_bonds', '24hs')
-                    print("📡 Subscribiendo: short_term_government_bonds - 24hs")
+    print("📡 Subscribiendo: short_term_government_bonds - 24hs")
     hb.online.subscribe_securities('short_term_government_bonds', '24hs')
     print("📡 Subscribiendo: repos")
     hb.online.subscribe_repos()
