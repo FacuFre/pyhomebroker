@@ -1,4 +1,4 @@
-pyhomebroker==0.3
+pyhomebroker==0.1
 pandas
 requests
 ...
