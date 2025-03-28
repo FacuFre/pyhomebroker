@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 from pyhomebroker import HomeBroker
 import pytz
+from collections import defaultdict
 
 # Supabase config
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -16,6 +17,8 @@ broker = int(os.getenv("BROKER_ID"))
 dni = os.getenv("DNI")
 user = os.getenv("USER")
 password = os.getenv("PASSWORD")
+
+contador_categorias = defaultdict(int)
 
 def guardar_en_supabase(tabla, rows):
     url = f"{SUPABASE_URL}/rest/v1/{tabla}"
@@ -30,6 +33,7 @@ def guardar_en_supabase(tabla, rows):
         record["updated_at"] = datetime.utcnow().isoformat()
         response = requests.post(url, headers=headers, json=record)
         print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
+        contador_categorias[tabla] += 1
 
 def clasificar_symbol(symbol):
     symbol = symbol.upper()
@@ -94,6 +98,9 @@ def on_error(online, error):
     print(f"Error Message Received: {error}")
 
 def ejecutar_ciclo():
+    global contador_categorias
+    contador_categorias = defaultdict(int)
+
     hb = HomeBroker(
         broker,
         on_options=on_options,
@@ -115,6 +122,11 @@ def ejecutar_ciclo():
     print("✅ Conectado. Esperando 5 segundos para recibir datos...")
     time.sleep(5)
     hb.online.disconnect()
+
+    print("📊 Resumen del ciclo:")
+    for tabla, cantidad in contador_categorias.items():
+        print(f"  - {tabla}: {cantidad} registros guardados")
+
     print("🔁 Desconectado. Esperando 5 minutos para el próximo ciclo...")
     time.sleep(300)
 
