@@ -32,8 +32,10 @@ def guardar_en_supabase(tabla, rows):
     data = rows.to_dict(orient="records")
     for record in data:
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
+        print(f"➡️ Intentando POST a: {tabla} | symbol: {record.get('symbol')}")
         response = requests.post(url, headers=headers, json=record)
-        if response.status_code >= 300:
+        print(f"📬 Status Supabase: {response.status_code}")
+        if response.status_code not in (200, 201):
             print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
         contador_categorias[tabla] += 1
 
