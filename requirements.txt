@@ -1,4 +1,4 @@
-pyhomebroker==1.0.1
+pyhomebroker==0.55
 numpy>=1.18.1
 pandas>=1.0.0
 pyquery>=1.2
