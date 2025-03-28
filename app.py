@@ -124,7 +124,7 @@ def ejecutar_ciclo():
     hb.online.subscribe_repos()
 
     print("✅ Conectado. Esperando 5 segundos para recibir datos...")
-    time.sleep(2)
+    time.sleep(5)
     hb.online.disconnect()
 
     print("📊 Resumen del ciclo:")
@@ -140,6 +140,9 @@ def dentro_de_horario():
     return ahora.hour >= 10 and ahora.hour < 17
 
 if __name__ == "__main__":
+    import sys
+    inicio = time.time()
+
     while True:
         if dentro_de_horario():
             try:
@@ -150,3 +153,7 @@ if __name__ == "__main__":
             print("🕒 Fuera de horario de mercado. Esperando 1 minuto...")
             time.sleep(60)
 
+        # Si pasó más de 1 hora, reiniciar
+        if time.time() - inicio > 3600:
+            print("♻️ Reinicio programado cada 1 hora")
+            os.execv(sys.executable, ['python'] + sys.argv)
