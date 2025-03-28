@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 import pandas as pd
 from pyhomebroker import HomeBroker
+import pytz
 
 # Supabase config
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -62,30 +63,43 @@ def on_repos(online, quotes):
 def on_error(online, error):
     print(f"Error Message Received: {error}")
 
-# Instancia de HomeBroker
-hb = HomeBroker(
-    broker,
-    on_options=on_options,
-    on_securities=on_securities,
-    on_repos=on_repos,
-    on_error=on_error
-)
+def ejecutar_ciclo():
+    hb = HomeBroker(
+        broker,
+        on_options=on_options,
+        on_securities=on_securities,
+        on_repos=on_repos,
+        on_error=on_error
+    )
+    
+    hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
+    hb.online.connect()
+    hb.online.subscribe_options()
+    hb.online.subscribe_securities('bluechips', '24hs')
+    hb.online.subscribe_securities('bluechips', 'SPOT')
+    hb.online.subscribe_securities('government_bonds', '24hs')
+    hb.online.subscribe_securities('government_bonds', 'SPOT')
+    hb.online.subscribe_securities('cedears', '24hs')
+    hb.online.subscribe_securities('general_board', '24hs')
+    hb.online.subscribe_securities('short_term_government_bonds', '24hs')
+    hb.online.subscribe_securities('corporate_bonds', '24hs')
+    hb.online.subscribe_repos()
 
-hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
-hb.online.connect()
-hb.online.subscribe_options()
-hb.online.subscribe_securities('bluechips', '24hs')
-hb.online.subscribe_securities('bluechips', 'SPOT')
-hb.online.subscribe_securities('government_bonds', '24hs')
-hb.online.subscribe_securities('government_bonds', 'SPOT')
-hb.online.subscribe_securities('cedears', '24hs')
-hb.online.subscribe_securities('general_board', '24hs')
-hb.online.subscribe_securities('short_term_government_bonds', '24hs')
-hb.online.subscribe_securities('corporate_bonds', '24hs')
-hb.online.subscribe_repos()
+    print("✅ Conectado y escuchando durante 5 minutos...")
+    time.sleep(300)  # Esperar 5 minutos
+    print("🔁 Ciclo finalizado. Esperando próximo intervalo...")
 
-while True:
-    try:
-        time.sleep(2)
-    except Exception:
-        print('Hubo un error al actualizar')
+def dentro_de_horario():
+    ahora = datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
+    return ahora.hour >= 10 and ahora.hour < 17
+
+if __name__ == "__main__":
+    while True:
+        if dentro_de_horario():
+            try:
+                ejecutar_ciclo()
+            except Exception as e:
+                print(f"❌ Error en ciclo: {e}")
+        else:
+            print("🕒 Fuera de horario de mercado. Esperando 1 minuto...")
+            time.sleep(60)
