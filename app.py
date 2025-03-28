@@ -31,12 +31,33 @@ def guardar_en_supabase(tabla, rows):
         response = requests.post(url, headers=headers, json=record)
         print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
 
-def on_options(online, quotes):
-    thisData = quotes.drop(['expiration', 'strike', 'kind'], axis=1)
-    thisData["change"] = thisData["change"] / 100
-    thisData["datetime"] = pd.to_datetime(thisData["datetime"])
-    thisData = thisData.rename(columns={"bid_size": "bidsize", "ask_size": "asksize"})
-    guardar_en_supabase("opciones", thisData.reset_index())
+def clasificar_symbol(symbol):
+    symbol = symbol.upper()
+
+    tasa_fija = {"S31M5", "S16A5", "BBA2S", "S28A5", "S16Y5", "BBY5", "S30Y5", "S18J5", "BJ25", "S30J5", "S31L5", "S29G5", "S29S5", "S30S5", "T17O5", "S30L5", "S10N5", "S28N5", "T30E6", "T3F6", "T30J6", "T15E7"}
+    bonos_soberanos = {"AL29", "AL29D", "AL30", "AL30D", "AL35", "AL35D", "AL41D", "AL41", "AL14D", "GD29", "GD29D", "GD30", "GD30D", "GD35", "GD35D", "GD38", "GD38D", "GD41", "GD41D", "GD46", "GD46D"}
+    dolar_linked = {"TV25", "TZV25", "TZVD5", "D16F6", "TZV26"}
+    bopreales = {"BPJ5D", "BPA7D", "BPB7D", "BPC7D", "BPD7D"}
+    bonos_cer = {"TZXM5", "TC24", "TZXJ5", "TZX05", "TZXKD5", "TZXM6", "TX06", "TX26", "TZXM7", "TX27", "TXD7", "TX28"}
+    cauciones = {"CAUCI1", "CAUCI2"}  # agregar los reales si se conocen
+    futuros_dolar = {"DOFUTABR24", "DOFUTJUN24"}  # agregar los reales si se conocen
+
+    if symbol in tasa_fija:
+        return "tasa_fija"
+    elif symbol in bonos_soberanos:
+        return "bonos_soberanos"
+    elif symbol in dolar_linked:
+        return "dolar_linked"
+    elif symbol in bopreales:
+        return "bopreales"
+    elif symbol in bonos_cer:
+        return "bonos_cer"
+    elif symbol in cauciones:
+        return "cauciones"
+    elif symbol in futuros_dolar:
+        return "futuros_dolar"
+    else:
+        return None
 
 def on_securities(online, quotes):
     thisData = quotes.reset_index()
@@ -44,7 +65,12 @@ def on_securities(online, quotes):
     thisData = thisData.drop(["settlement"], axis=1)
     thisData["change"] = thisData["change"] / 100
     thisData["datetime"] = pd.to_datetime(thisData["datetime"])
-    guardar_en_supabase("acciones", thisData)
+
+    for _, row in thisData.iterrows():
+        symbol = row["symbol"].split(" - ")[0]  # quitar el plazo
+        tabla = clasificar_symbol(symbol)
+        if tabla:
+            guardar_en_supabase(tabla, pd.DataFrame([row]))
 
 def on_repos(online, quotes):
     thisData = quotes.reset_index()
@@ -60,6 +86,9 @@ def on_repos(online, quotes):
     thisData = thisData[['last', 'turnover', 'bid_amount', 'bid_rate', 'ask_rate', 'ask_amount']]
     guardar_en_supabase("cauciones", thisData.reset_index())
 
+def on_options(online, quotes):
+    pass  # no estamos usando opciones para este caso
+
 def on_error(online, error):
     print(f"Error Message Received: {error}")
 
@@ -71,22 +100,19 @@ def ejecutar_ciclo():
         on_repos=on_repos,
         on_error=on_error
     )
-    
+
     hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
     hb.online.connect()
-    hb.online.subscribe_options()
-    hb.online.subscribe_securities('bluechips', '24hs')
-    hb.online.subscribe_securities('bluechips', 'SPOT')
-    hb.online.subscribe_securities('government_bonds', '24hs')
-    hb.online.subscribe_securities('government_bonds', 'SPOT')
-    hb.online.subscribe_securities('cedears', '24hs')
-    hb.online.subscribe_securities('general_board', '24hs')
-    hb.online.subscribe_securities('short_term_government_bonds', '24hs')
-    hb.online.subscribe_securities('corporate_bonds', '24hs')
+    
+    # Solo suscripciones necesarias según categorías utilizadas
+    hb.online.subscribe_securities('government_bonds', '24hs')         # Tasa Fija, Bonos CER, Bonos Soberanos
+    hb.online.subscribe_securities('dollar_linked_bonds', '24hs')      # Dólar Linked
+    hb.online.subscribe_securities('provincial_bonds', '24hs')         # Bopreales
+    hb.online.subscribe_securities('short_term_government_bonds', '24hs') # Cauciones
     hb.online.subscribe_repos()
 
     print("✅ Conectado y escuchando durante 5 minutos...")
-    time.sleep(300)  # Esperar 5 minutos
+    time.sleep(300)
     print("🔁 Ciclo finalizado. Esperando próximo intervalo...")
 
 def dentro_de_horario():
