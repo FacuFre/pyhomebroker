@@ -149,7 +149,7 @@ def ejecutar_ciclo():
 
     gc.collect()
     print("🧹 Memoria limpiada. Esperando 5 minutos para el próximo ciclo...")
-    time.sleep(300)
+    time.sleep(30)
 
 def dentro_de_horario():
     ahora = datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
