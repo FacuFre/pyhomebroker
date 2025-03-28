@@ -5,8 +5,8 @@ import os
 
 app = Flask(__name__)
 
-SUPABASE_URL = os.getenv("https://hgtdggjfkjzmvitvcddc.supabase.co")
-SUPABASE_API_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhndGRnZ2pma2p6bXZpdHZjZGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMxMjgyMjMsImV4cCI6MjA1ODcwNDIyM30.cecD5X7TzGoQokBRFWlyMrhh6PFcL7xJaCfH3WQcbBM")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
 
 def guardar_en_supabase(symbol, description):
     url = f"{SUPABASE_URL}/rest/v1/instrumentos_pyhome"
