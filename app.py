@@ -27,4 +27,6 @@ def main():
     for inst in instruments[:10]:
         guardar_en_supabase(inst["symbol"], inst["description"])
 
+# 👇 ESTA PARTE TENÉS QUE TENERLA BIEN
 if __name__ == "__main__":
+    main()
