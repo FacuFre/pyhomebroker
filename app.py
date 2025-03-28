@@ -57,6 +57,7 @@ def clasificar_symbol(symbol):
     elif symbol in futuros_dolar:
         return "futuros_dolar"
     else:
+        print(f"⚠️ No clasificado: {symbol}")
         return None
 
 def on_securities(online, quotes):
@@ -103,17 +104,19 @@ def ejecutar_ciclo():
 
     hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
     hb.online.connect()
-    
-    # Solo suscripciones necesarias según categorías utilizadas
-    hb.online.subscribe_securities('government_bonds', '24hs')         # Tasa Fija, Bonos CER, Bonos Soberanos
-    hb.online.subscribe_securities('dollar_linked_bonds', '24hs')      # Dólar Linked
-    hb.online.subscribe_securities('provincial_bonds', '24hs')         # Bopreales
-    hb.online.subscribe_securities('short_term_government_bonds', '24hs') # Cauciones
+
+    # Suscripciones solo para las categorías relevantes
+    hb.online.subscribe_securities('government_bonds', '24hs')
+    hb.online.subscribe_securities('dollar_linked_bonds', '24hs')
+    hb.online.subscribe_securities('provincial_bonds', '24hs')
+    hb.online.subscribe_securities('short_term_government_bonds', '24hs')
     hb.online.subscribe_repos()
 
-    print("✅ Conectado y escuchando durante 5 minutos...")
+    print("✅ Conectado. Esperando 5 segundos para recibir datos...")
+    time.sleep(5)
+    hb.online.disconnect()
+    print("🔁 Desconectado. Esperando 5 minutos para el próximo ciclo...")
     time.sleep(300)
-    print("🔁 Ciclo finalizado. Esperando próximo intervalo...")
 
 def dentro_de_horario():
     ahora = datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
