@@ -1,35 +1,20 @@
+# app.py
 import time
-from pyhomebroker import HomeBroker
-import Options_Helper_HM
-import pandas as pd
 import os
 import requests
 from datetime import datetime
+import pandas as pd
+from pyhomebroker import HomeBroker
 
 # Supabase config
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
 
-# Broker credentials
+# Credenciales de broker
 broker = int(os.getenv("BROKER_ID"))
 dni = os.getenv("DNI")
 user = os.getenv("USER")
 password = os.getenv("PASSWORD")
-
-# Estructuras locales
-ACC = Options_Helper_HM.getAccionesList()
-cedears = Options_Helper_HM.getCedearsList()
-cauciones = Options_Helper_HM.cauciones
-options = Options_Helper_HM.getOptionsList()
-bonos = Options_Helper_HM.getBonosList()
-letras = Options_Helper_HM.getLetrasList()
-ONS = Options_Helper_HM.getONSList()
-PanelGeneral = Options_Helper_HM.getPanelGeneralList()
-everything = pd.concat([ACC, bonos, letras, PanelGeneral, ONS, cedears])
-listLength = len(everything) + 2
-
-print("OK: ACTUALIZANDO INFORMACION")
-
 
 def guardar_en_supabase(tabla, rows):
     url = f"{SUPABASE_URL}/rest/v1/{tabla}"
@@ -45,31 +30,22 @@ def guardar_en_supabase(tabla, rows):
         response = requests.post(url, headers=headers, json=record)
         print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
 
-
 def on_options(online, quotes):
-    global options
     thisData = quotes.drop(['expiration', 'strike', 'kind'], axis=1)
     thisData["change"] = thisData["change"] / 100
     thisData["datetime"] = pd.to_datetime(thisData["datetime"])
     thisData = thisData.rename(columns={"bid_size": "bidsize", "ask_size": "asksize"})
-    options.update(thisData)
     guardar_en_supabase("opciones", thisData.reset_index())
 
-
 def on_securities(online, quotes):
-    global ACC
     thisData = quotes.reset_index()
     thisData["symbol"] = thisData["symbol"] + " - " + thisData["settlement"]
     thisData = thisData.drop(["settlement"], axis=1)
-    thisData = thisData.set_index("symbol")
     thisData["change"] = thisData["change"] / 100
     thisData["datetime"] = pd.to_datetime(thisData["datetime"])
-    everything.update(thisData)
-    guardar_en_supabase("acciones", thisData.reset_index())
-
+    guardar_en_supabase("acciones", thisData)
 
 def on_repos(online, quotes):
-    global cauciones
     thisData = quotes.reset_index()
     thisData = thisData.set_index("symbol")
     thisData = thisData[['PESOS' in s for s in quotes.index]]
@@ -81,16 +57,14 @@ def on_repos(online, quotes):
     thisData["ask_rate"] = thisData["ask_rate"] / 100
     thisData = thisData.drop(['open', 'high', 'low', 'volume', 'operations', 'datetime'], axis=1)
     thisData = thisData[['last', 'turnover', 'bid_amount', 'bid_rate', 'ask_rate', 'ask_amount']]
-    cauciones.update(thisData)
     guardar_en_supabase("cauciones", thisData.reset_index())
-
 
 def on_error(online, error):
     print(f"Error Message Received: {error}")
 
-
 # Instancia de HomeBroker
-hb = HomeBroker(int(broker),
+hb = HomeBroker(
+    broker,
     on_options=on_options,
     on_securities=on_securities,
     on_repos=on_repos,
@@ -115,4 +89,3 @@ while True:
         time.sleep(2)
     except Exception:
         print('Hubo un error al actualizar')
-
