@@ -107,7 +107,7 @@ def ejecutar_ciclo():
 
 def dentro_de_horario():
     ahora = datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
-    return 10 <= ahora.hour < 17
+    return 10 <= ahora.hour < 18
 
 if __name__ == "__main__":
     inicio = time.time()
