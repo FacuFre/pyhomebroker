@@ -32,11 +32,11 @@ def guardar_en_supabase(tabla, rows):
     data = rows.to_dict(orient="records")
     for record in data:
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
-        print(f"➡️ Intentando POST a: {tabla} | symbol: {record.get('symbol')}")
+        if not record.get("symbol"):
+            record["symbol"] = "CAUCION"
         response = requests.post(url, headers=headers, json=record)
-        print(f"📬 Status Supabase: {response.status_code}")
         if response.status_code not in (200, 201):
-            print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
+            print(f"❌ Error Supabase [{tabla}] → {response.status_code}: {response.text}")
         contador_categorias[tabla] += 1
 
 def clasificar_symbol(symbol):
@@ -55,7 +55,7 @@ def clasificar_symbol(symbol):
 
     if symbol in tasa_fija:
         return "tasa_fija"
-    elif symbol in bonos_soberanos:
+    elif symbol in bonos_soberonos:
         return "bonos_soberanos"
     elif symbol in dolar_linked:
         return "dolar_linked"
@@ -118,11 +118,8 @@ def ejecutar_ciclo():
     hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
     hb.online.connect()
 
-    print("📡 Subscribiendo: government_bonds - 24hs")
     hb.online.subscribe_securities('government_bonds', '24hs')
-    print("📡 Subscribiendo: short_term_government_bonds - 24hs")
     hb.online.subscribe_securities('short_term_government_bonds', '24hs')
-    print("📡 Subscribiendo: repos")
     hb.online.subscribe_repos()
 
     print("✅ Conectado. Esperando 5 segundos para recibir datos...")
