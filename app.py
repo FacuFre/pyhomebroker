@@ -35,16 +35,13 @@ def guardar_en_supabase(tabla, rows):
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = requests.post(url, headers=headers, json=record)
         if response.status_code >= 300:
-                            print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
-        if response.status_code >= 300:
-        print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
+            print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
         print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
         contador_categorias[tabla] += 1
 
 def clasificar_symbol(symbol):
     symbol = symbol.upper()
 
-    # Ignorar instrumentos con cotización Cable
     if symbol.endswith("C"):
         return None
 
@@ -165,7 +162,6 @@ if __name__ == "__main__":
             print("🕒 Fuera de horario de mercado. Esperando 1 minuto...")
             time.sleep(60)
 
-        # Si pasó más de 1 hora, reiniciar
         if time.time() - inicio > 3600:
             print("♻️ Reinicio programado cada 1 hora")
             os.execv(sys.executable, ['python'] + sys.argv)
