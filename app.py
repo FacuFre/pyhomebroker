@@ -30,14 +30,21 @@ def guardar_en_supabase(tabla, rows):
         "Prefer": "resolution=merge-duplicates"
     }
     data = rows.to_dict(orient="records")
+
     for record in data:
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
         if not record.get("symbol"):
             record["symbol"] = "CAUCION"
+
+        # 🔍 DEBUG LOG: mostramos qué se va a enviar
+        print(f"📤 Enviando a Supabase → {tabla} | Payload:")
+        print(record)
+
         response = requests.post(url, headers=headers, json=record)
         if response.status_code not in (200, 201):
             print(f"❌ Error Supabase [{tabla}] → {response.status_code}: {response.text}")
-        contador_categorias[tabla] += 1
+        else:
+            contador_categorias[tabla] += 1
 
 def clasificar_symbol(symbol):
     symbol = symbol.upper()
@@ -55,7 +62,7 @@ def clasificar_symbol(symbol):
 
     if symbol in tasa_fija:
         return "tasa_fija"
-    elif symbol in bonos_soberonos:
+    elif symbol in bonos_soberanos:
         return "bonos_soberanos"
     elif symbol in dolar_linked:
         return "dolar_linked"
@@ -71,6 +78,7 @@ def clasificar_symbol(symbol):
         return None
 
 def on_securities(online, quotes):
+    print(f"📥 on_securities recibió {len(quotes)} instrumentos")
     thisData = quotes.reset_index()
     thisData["symbol"] = thisData["symbol"] + " - " + thisData["settlement"]
     thisData = thisData.drop(["settlement"], axis=1)
@@ -81,9 +89,13 @@ def on_securities(online, quotes):
         symbol = row["symbol"].split(" - ")[0]
         tabla = clasificar_symbol(symbol)
         if tabla:
+            print(f"✅ Clasificado: {symbol} → {tabla}")
             guardar_en_supabase(tabla, pd.DataFrame([row]))
+        else:
+            print(f"⚠️ No clasificado: {symbol}")
 
 def on_repos(online, quotes):
+    print(f"📥 on_repos recibió {len(quotes)} instrumentos")
     thisData = quotes.reset_index()
     thisData = thisData.set_index("symbol")
     thisData = thisData[['PESOS' in s for s in quotes.index]]
@@ -118,8 +130,13 @@ def ejecutar_ciclo():
     hb.auth.login(dni=dni, user=user, password=password, raise_exception=True)
     hb.online.connect()
 
+    print("📡 Subscribiendo: government_bonds - 24hs")
     hb.online.subscribe_securities('government_bonds', '24hs')
+
+    print("📡 Subscribiendo: short_term_government_bonds - 24hs")
     hb.online.subscribe_securities('short_term_government_bonds', '24hs')
+
+    print("📡 Subscribiendo: repos")
     hb.online.subscribe_repos()
 
     print("✅ Conectado. Esperando 5 segundos para recibir datos...")
