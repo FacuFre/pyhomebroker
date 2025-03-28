@@ -31,12 +31,12 @@ def guardar_en_supabase(tabla, rows):
     }
     data = rows.to_dict(orient="records")
     for record in data:
-        print(f"📤 Enviando a Supabase: {record}")
+        
         record["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = requests.post(url, headers=headers, json=record)
         if response.status_code >= 300:
             print(f"❌ ERROR al guardar en Supabase ({response.status_code}): {response.text}")
-        print(f"[{tabla}] {record.get('symbol')} → {response.status_code}")
+        
         contador_categorias[tabla] += 1
 
 def clasificar_symbol(symbol):
@@ -72,7 +72,7 @@ def clasificar_symbol(symbol):
         return None
 
 def on_securities(online, quotes):
-    print(f"📥 Recibidos {len(quotes)} instrumentos")
+    
     thisData = quotes.reset_index()
     thisData["symbol"] = thisData["symbol"] + " - " + thisData["settlement"]
     thisData = thisData.drop(["settlement"], axis=1)
@@ -81,7 +81,7 @@ def on_securities(online, quotes):
 
     for _, row in thisData.iterrows():
         symbol = row["symbol"].split(" - ")[0]
-        print(f"🔎 Clasificando: {symbol}")
+        
         tabla = clasificar_symbol(symbol)
         if tabla:
             guardar_en_supabase(tabla, pd.DataFrame([row]))
