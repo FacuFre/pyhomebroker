@@ -153,7 +153,7 @@ def ejecutar_ciclo():
 
 def dentro_de_horario():
     ahora = datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
-    return ahora.hour >= 10 and ahora.hour < 17
+    return ahora.hour >= 10 and ahora.hour < 18
 
 if __name__ == "__main__":
     import sys
